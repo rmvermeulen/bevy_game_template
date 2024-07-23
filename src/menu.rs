@@ -220,3 +220,58 @@ fn cleanup_menu(mut commands: Commands, menu: Query<Entity, With<Menu>>) {
         commands.entity(entity).despawn_recursive();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::state::app::StatesPlugin;
+    use rmv_bevy_testing_tools::*;
+    use rstest::*;
+    use speculoos::{assert_that, option::OptionAssertions};
+
+    #[fixture]
+    fn menu_app(
+        #[from(test_app)]
+        #[with((StatesPlugin, MenuPlugin))]
+        mut app: TestApp,
+    ) -> TestApp {
+        app.init_state::<GameState>()
+            .insert_resource(TextureAssets {
+                bevy: Handle::weak_from_u128(0),
+                github: Handle::weak_from_u128(0),
+            });
+        app
+    }
+
+    #[rstest]
+    fn test_menu_plugin(#[from(menu_app)] mut app: TestApp) {
+        app.update();
+
+        assert_that!(app.get_state::<GameState>())
+            .named("initial GameState")
+            .is_some()
+            .is_equal_to(&GameState::Loading);
+
+        assert_that!(app.world_mut().query::<&Camera>().iter(app.world()).next())
+            .named("a camera before GameState::Menu")
+            .is_none();
+
+        app.set_next_state(GameState::Menu)
+            .expect("Failed to set next GameState");
+        app.update();
+
+        assert_that!(app.get_state::<GameState>())
+            .named("changed GameState")
+            .is_some()
+            .is_equal_to(&GameState::Menu);
+
+        assert_that!(app
+            .world_mut()
+            .query::<&Camera>()
+            .iter(app.world())
+            .next()
+            .map(|_| ()))
+        .named("a camera after GameState::Menu")
+        .is_some();
+    }
+}
